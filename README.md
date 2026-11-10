@@ -107,7 +107,8 @@ cd web && pnpm install && pnpm dev
 
 申诉创建与处理结果可推送到钉钉群，使用群自定义机器人的 Webhook + 加签。
 未配置时静默跳过，不影响申诉功能。配置项为 `quantify.dingtalk.*`，
-通过环境变量 `DINGTALK_ENABLED` / `DINGTALK_WEBHOOK` / `DINGTALK_SECRET` 注入。
+通过环境变量 `DINGTALK_ENABLED` / `DINGTALK_WEBHOOK` / `DINGTALK_SECRET`，
+以及 `DINGTALK_NOTIFY_REVIEW`（受理/驳回结果是否也发，默认 true）注入。
 
 消息在申诉事务提交后异步发送；发送失败不回滚业务，可在页面上手动重试。
 
@@ -115,4 +116,5 @@ cd web && pnpm install && pnpm dev
 
 - 仓库内不含任何真实学生信息、账号口令或服务器凭据。
 - 内部文档、运维脚本与初始化用真实数据不在本仓库，仅保留应用代码。
+- 本地私有配置（库口令、钉钉凭据）放 `server/config/application.yml`，已在 `.gitignore` 中排除。
 - 项目仍在迭代中，部分页面与批量能力尚未完成。

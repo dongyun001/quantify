@@ -39,6 +39,7 @@ backups/
 docs/
 AGENTS.md
 tools/
+server/config/
 sql/seed_data.sql
 sql/seed_0_students.sql
 导入数据*.md
