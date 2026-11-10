@@ -1,0 +1,45 @@
+# ---- Java / Maven ----
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties.bak
+
+# ---- Node ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+.pnpm-store/
+
+# ---- 数据库数据卷 ----
+data/
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---- 系统 ----
+.DS_Store
+Thumbs.db
+
+# ---- 临时文件 ----
+*.log
+/tmp/
+
+# ---- ZCode 钩子运行期状态 ----
+.zcode/
+
+# ---- 数据库备份（含全量数据，绝不入库）----
+backups/
+
+# ---- 公开仓库：内部文档与真实数据，一律不提交 ----
+docs/
+AGENTS.md
+tools/
+sql/seed_data.sql
+sql/seed_0_students.sql
+导入数据*.md
+导入数据*.csv

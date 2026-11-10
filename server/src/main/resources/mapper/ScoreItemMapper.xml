@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quantify.score.ScoreItemMapper">
+
+    <!--
+      分值的符号只在这里出现一次。
+      points 恒为正数，方向由 category 决定（1加分 2扣分）：
+          加分 → +points
+          扣分 → -points
+      这样永远不会出现"扣分填成 -6 导致 -(-6)=+6 变成加分"的错误。
+    -->
+    <sql id="scoreExpr">
+        SUM(CASE WHEN i.category = 2 THEN -i.points ELSE i.points END)
+    </sql>
+
+    <!-- 只统计已通过、未删除的流水 -->
+    <sql id="approvedJoin">
+        LEFT JOIN `score_item` i
+               ON i.student_id = s.id
+              AND i.term    = #{term}
+              AND i.status  = 2
+              AND i.deleted = 0
+    </sql>
+
+    <!-- 数据范围过滤：三级只传一个 class_id，一级二级传全院列表 -->
+    <sql id="scopeFilter">
+        <if test="classIds != null and classIds.size() > 0">
+            AND s.class_id IN
+            <foreach collection="classIds" item="cid" open="(" separator="," close=")">
+                #{cid}
+            </foreach>
+        </if>
+    </sql>
+
+
+    <!-- ==================================================================
+         Q1. 积分总表（分页）
+
+         ★ 排名必须在【分页之前】算完，否则每页都从 1 重新编号。
+           所以 ROW_NUMBER 放在子查询里，外层才 LIMIT/OFFSET。
+
+         ★ COUNT 不需要 join 那张聚合子表 —— 筛选条件（范围、班级、关键字）
+           只跟 student / sys_class 有关，跟分数无关。少 join 一次，全表 4000 行时差别明显。
+         ================================================================== -->
+    <sql id="boardWhere">
+        WHERE s.status = 1
+        <include refid="scopeFilter"/>
+        <if test="classId != null">AND s.class_id = #{classId}</if>
+        <if test="gradeId != null">AND c.grade_id = #{gradeId}</if>
+        <if test="keyword != null and keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{keyword}, '%')
+                 OR s.name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </sql>
+
+    <select id="selectBoard" resultType="com.quantify.score.ScoreBoardVO">
+        SELECT * FROM (
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY
+                    s.base_score + IFNULL(agg.delta, 0) DESC, s.student_no ASC
+                )                                                     AS `rank`,
+                s.id                                                  AS studentId,
+                s.student_no                                          AS studentNo,
+                s.name                                                AS `name`,
+                s.class_id                                            AS classId,
+                c.name                                                AS className,
+                g.grade_name                                          AS gradeName,
+                IFNULL(agg.add_score, 0)                              AS addScore,
+                -IFNULL(agg.deduct_score, 0)                          AS deductScore,
+                s.base_score                                          AS baseScore,
+                s.base_score + IFNULL(agg.delta, 0)                   AS totalScore
+            FROM `student` s
+            JOIN `sys_class` c ON c.id = s.class_id
+            LEFT JOIN `sys_grade` g ON g.id = c.grade_id
+            LEFT JOIN (
+                SELECT
+                    i.student_id,
+                    SUM(CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) AS delta,
+                    SUM(CASE WHEN i.category = 1 THEN i.points END)                AS add_score,
+                    SUM(CASE WHEN i.category = 2 THEN i.points END)                AS deduct_score
+                FROM `score_item` i
+                WHERE i.term    = #{term}
+                  AND i.status  = 2
+                  AND i.deleted = 0
+                GROUP BY i.student_id
+            ) agg ON agg.student_id = s.id
+            <include refid="boardWhere"/>
+        ) t
+        ORDER BY t.`rank`
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countBoard" resultType="long">
+        SELECT COUNT(*)
+        FROM `student` s
+        JOIN `sys_class` c ON c.id = s.class_id
+        <include refid="boardWhere"/>
+    </select>
+
+    <!-- ==================================================================
+         Q2. 单个学生的分数汇总（字段结构与总表保持一致）
+         ================================================================== -->
+    <select id="selectStudentSummary" resultType="com.quantify.score.ScoreBoardVO">
+        SELECT
+            s.id                              AS studentId,
+            s.student_no                      AS studentNo,
+            s.name                            AS `name`,
+            s.class_id                        AS classId,
+            c.name                            AS className,
+            g.grade_name                      AS gradeName,
+            IFNULL(agg.add_score, 0)          AS addScore,
+            -IFNULL(agg.deduct_score, 0)      AS deductScore,
+            s.base_score                      AS baseScore,
+            s.base_score + IFNULL(agg.delta, 0) AS totalScore
+        FROM `student` s
+        JOIN `sys_class` c ON c.id = s.class_id
+        LEFT JOIN `sys_grade` g ON g.id = c.grade_id
+        LEFT JOIN (
+            SELECT
+                i.student_id,
+                SUM(CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) AS delta,
+                SUM(CASE WHEN i.category = 1 THEN i.points END)                AS add_score,
+                SUM(CASE WHEN i.category = 2 THEN i.points END)                AS deduct_score
+            FROM `score_item` i
+            WHERE i.term    = #{term}
+              AND i.status  = 2
+              AND i.deleted = 0
+            GROUP BY i.student_id
+        ) agg ON agg.student_id = s.id
+        WHERE s.id = #{studentId}
+    </select>
+
+
+    <!-- ==================================================================
+         Q3. 待审列表
+         ================================================================== -->
+    <sql id="pendingWhere">
+        WHERE i.status  = 1
+          AND i.deleted = 0
+        <if test="deptId != null">AND i.dept_id = #{deptId}</if>
+        <if test="classId != null">AND i.class_id = #{classId}</if>
+        <if test="category != null">AND i.category = #{category}</if>
+        <if test="dimension != null">
+            <choose>
+                <when test="dimension == 0">AND i.dimension IS NULL</when>
+                <otherwise>AND i.dimension = #{dimension}</otherwise>
+            </choose>
+        </if>
+        <if test="changeOnly != null and changeOnly">AND i.change_type &lt;&gt; 0</if>
+    </sql>
+
+    <select id="selectPending" resultType="com.quantify.score.ScoreItem">
+        SELECT
+            i.*,
+            st.student_no   AS studentNo,
+            st.name         AS studentName,
+            c.name          AS className,
+            d.dept_name     AS deptName,
+            u.real_name     AS submitterName
+        FROM `score_item` i
+        JOIN `student`   st ON st.id = i.student_id
+        JOIN `sys_class` c  ON c.id  = i.class_id
+        LEFT JOIN `sys_dept` d ON d.id = i.dept_id
+        LEFT JOIN `sys_user` u ON u.id = i.submitted_by
+        <include refid="pendingWhere"/>
+        ORDER BY i.submitted_at DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPending" resultType="long">
+        SELECT COUNT(*)
+        FROM `score_item` i
+        <include refid="pendingWhere"/>
+    </select>
+
+
+    <!-- ==================================================================
+         Q4. 学生流水明细
+         ================================================================== -->
+    <select id="selectItems" resultType="com.quantify.score.ScoreItem">
+        SELECT
+            i.*,
+            st.student_no AS studentNo,
+            st.name       AS studentName,
+            c.name        AS className,
+            d.dept_name   AS deptName,
+            u.real_name   AS submitterName,
+            r.real_name   AS reviewerName
+        FROM `score_item` i
+        JOIN `student`   st ON st.id = i.student_id
+        JOIN `sys_class` c  ON c.id  = i.class_id
+        LEFT JOIN `sys_dept` d ON d.id = i.dept_id
+        LEFT JOIN `sys_user` u ON u.id = i.submitted_by
+        LEFT JOIN `sys_user` r ON r.id = i.reviewed_by
+        WHERE i.student_id = #{studentId}
+          AND i.term       = #{term}
+          AND i.deleted    = 0
+        <if test="category != null">AND i.category = #{category}</if>
+        <if test="dimension != null">
+            <choose>
+                <when test="dimension == 0">AND i.dimension IS NULL</when>
+                <otherwise>AND i.dimension = #{dimension}</otherwise>
+            </choose>
+        </if>
+        <if test="status != null">AND i.status = #{status}</if>
+        <!-- 失效的记录排在最后，不干扰查看当前有效数据 -->
+        ORDER BY (i.status = 5) ASC, i.occurred_on DESC, i.id DESC
+    </select>
+
+
+    <!-- ==================================================================
+         Q5. 我的申请（二级/一级只看自己提交的）
+         ================================================================== -->
+    <sql id="mineWhere">
+        WHERE i.created_by = #{userId}
+          AND i.deleted    = 0
+        <if test="status != null">AND i.status = #{status}</if>
+    </sql>
+
+    <select id="selectMine" resultType="com.quantify.score.ScoreItem">
+        SELECT
+            i.*,
+            st.student_no AS studentNo,
+            st.name       AS studentName,
+            c.name        AS className
+        FROM `score_item` i
+        JOIN `student`   st ON st.id = i.student_id
+        JOIN `sys_class` c  ON c.id  = i.class_id
+        <include refid="mineWhere"/>
+        ORDER BY i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMine" resultType="long">
+        SELECT COUNT(*) FROM `score_item` i
+        <include refid="mineWhere"/>
+    </select>
+
+
+    <!-- ==================================================================
+         Q6. 单条流水（带展示字段）
+         ================================================================== -->
+    <select id="selectItemById" resultType="com.quantify.score.ScoreItem">
+        SELECT
+            i.*,
+            st.student_no AS studentNo,
+            st.name       AS studentName,
+            c.name        AS className,
+            d.dept_name   AS deptName,
+            u.real_name   AS submitterName,
+            r.real_name   AS reviewerName,
+            o.occurred_on AS originOccurredOn,
+            o.points      AS originPoints,
+            o.reason      AS originReason
+        FROM `score_item` i
+        JOIN `student`   st ON st.id = i.student_id
+        JOIN `sys_class` c  ON c.id  = i.class_id
+        LEFT JOIN `sys_dept` d ON d.id = i.dept_id
+        LEFT JOIN `sys_user` u ON u.id = i.submitted_by
+        LEFT JOIN `sys_user` r ON r.id = i.reviewed_by
+        LEFT JOIN `score_item` o ON o.id = i.origin_id
+        WHERE i.id = #{id}
+          AND i.deleted = 0
+    </select>
+
+    <select id="countOwnedBy" resultType="int">
+        SELECT COUNT(*) FROM `score_item`
+        WHERE id = #{id} AND created_by = #{userId} AND deleted = 0
+    </select>
+
+
+    <!-- ==================================================================
+         Q7. 导出
+
+         与原表逐行比对的列：加分 / 扣分 / 基础分 / 总分。
+         备注列的格式也对齐原表：'1.双语未到(-2)(10.17)2.被子未叠(-2)(12.08)'
+
+         ⚠ GROUP_CONCAT 默认上限 1024 字节，超了会【静默截断】不报错。
+           连接池复用连接，SESSION 级设置会残留，所以每次导出前都要重设一次，
+           不能只在启动时设一次。见 ExportService。
+         ================================================================== -->
+    <select id="selectForExport" resultType="com.quantify.score.ScoreBoardVO">
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY s.student_no)            AS `rank`,
+            s.id                                                  AS studentId,
+            s.student_no                                          AS studentNo,
+            s.name                                                AS `name`,
+            s.class_id                                            AS classId,
+            c.name                                                AS className,
+            IFNULL(SUM(CASE WHEN i.category = 1 THEN i.points END), 0) AS addScore,
+            -IFNULL(SUM(CASE WHEN i.category = 2 THEN i.points END), 0) AS deductScore,
+            IFNULL(SUM(CASE WHEN i.dimension = 1
+                THEN (CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) END), 0) AS deScore,
+            IFNULL(SUM(CASE WHEN i.dimension = 2
+                THEN (CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) END), 0) AS zhiScore,
+            IFNULL(SUM(CASE WHEN i.dimension = 3
+                THEN (CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) END), 0) AS tiScore,
+            IFNULL(SUM(CASE WHEN i.dimension = 4
+                THEN (CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) END), 0) AS meiScore,
+            IFNULL(SUM(CASE WHEN i.dimension = 5
+                THEN (CASE WHEN i.category = 2 THEN -i.points ELSE i.points END) END), 0) AS laoScore,
+            s.base_score                                          AS baseScore,
+            s.base_score
+                + IFNULL(SUM(CASE WHEN i.category = 2 THEN -i.points ELSE i.points END), 0) AS totalScore,
+
+            IFNULL(GROUP_CONCAT(
+                CASE WHEN i.category = 1 THEN CONCAT(
+                    i.seq, '.', i.reason, '(+',
+                    TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM CAST(i.points AS CHAR))), ')',
+                    IF(i.occurred_on IS NULL, '',
+                       CONCAT('(', DATE_FORMAT(i.occurred_on, '%m.%d'), ')'))
+                ) END
+                ORDER BY i.seq SEPARATOR ''), '')                 AS addRemark,
+
+            IFNULL(GROUP_CONCAT(
+                CASE WHEN i.category = 2 THEN CONCAT(
+                    i.seq, '.', i.reason, '(-',
+                    TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM CAST(i.points AS CHAR))), ')',
+                    IF(i.occurred_on IS NULL, '',
+                       CONCAT('(', DATE_FORMAT(i.occurred_on, '%m.%d'), ')'))
+                ) END
+                ORDER BY i.seq SEPARATOR ''), '')                 AS deductRemark
+        FROM `student` s
+        JOIN `sys_class` c ON c.id = s.class_id
+        LEFT JOIN (
+            <!-- 先给每个学生的每类流水编号 1. 2. 3. …，还原原表备注的写法 -->
+            SELECT id, student_id, category, dimension, points, reason, occurred_on,
+                   ROW_NUMBER() OVER (PARTITION BY student_id, category
+                                      ORDER BY occurred_on, id) AS seq
+            FROM `score_item`
+            WHERE term    = #{term}
+              AND status  = 2
+              AND deleted = 0
+        ) i ON i.student_id = s.id
+        WHERE s.class_id = #{classId}
+          AND s.status   = 1
+        GROUP BY s.id, s.student_no, s.name, s.class_id, c.name, s.base_score
+        ORDER BY s.student_no
+    </select>
+
+</mapper>

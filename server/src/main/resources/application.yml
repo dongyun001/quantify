@@ -1,0 +1,83 @@
+server:
+  # 不用 8080：Docker Desktop 自身会监听 8080，会撞车。
+  # 前端 Vite 代理指向这个端口。
+  port: 8090
+
+spring:
+  application:
+    name: quantify-server
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 数据库跑在 docker 里，宿主端口 3307（不是默认的 3306）
+    url: jdbc:mysql://localhost:3307/quantify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true
+    username: root
+    password: ${DB_PASSWORD:root123456}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 10000
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: always
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.quantify.*.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    # 开发期把 SQL 打出来，方便对账；上线改成 NoLoggingImpl
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  token-name: satoken
+  # 30 天 = 2592000 秒
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-log: false
+  # 关掉 Sa-Token 自己的 cookie 读写，纯走请求头，避免和前后端分离的 CORS 打架
+  is-read-cookie: false
+  is-read-header: true
+
+quantify:
+  # 初始管理员的密码。仅在账号表为空时用于创建第一个账号，之后这段配置就失效了。
+  # 上线前请改掉，或者第一次登录后立刻改密。
+  init-admin-username: admin
+  init-admin-password: ${INIT_ADMIN_PASSWORD:123456}
+
+  # 登录失败限流。需求文档 §2.5：同账号连续失败 5 次锁定 10 分钟。
+  # 计数放内存，重启服务即清零（单实例部署下可以接受）。
+  login:
+    max-fail: 5
+    lock-minutes: 10
+
+  # 钉钉群自定义机器人。申诉创建后通知管理员群，受理/驳回结果默认也发。
+  # 本地不配置时 enabled=false，只跳过发送，不影响申诉本身。
+  # ⚠ 不要把这些值放进 sys_config —— /api/configs 所有登录用户可读。
+  dingtalk:
+    enabled: ${DINGTALK_ENABLED:false}
+    webhook: ${DINGTALK_WEBHOOK:}
+    secret: ${DINGTALK_SECRET:}
+    notify-review-result: ${DINGTALK_NOTIFY_REVIEW:true}
+
+logging:
+  level:
+    root: info
+    com.quantify: debug

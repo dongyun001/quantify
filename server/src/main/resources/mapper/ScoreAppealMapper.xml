@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quantify.score.ScoreAppealMapper">
+
+    <!--
+      申诉列表 / 详情统一从这里取展示字段。
+      原记录可能已经被变更链替换（status=5），这里仍然能查到它，
+      所以 LEFT JOIN 且不加 i.status = 2 的条件。
+    -->
+    <sql id="detailSelect">
+        SELECT
+            a.*,
+            st.student_no AS studentNo,
+            st.name       AS studentName,
+            c.name        AS className,
+            i.category    AS scoreCategory,
+            i.dimension   AS scoreDimension,
+            i.points      AS scorePoints,
+            i.reason      AS scoreReason,
+            i.occurred_on AS scoreOccurredOn,
+            i.status      AS scoreStatus,
+            u.real_name   AS createdByName,
+            r.real_name   AS reviewedByName
+        FROM `score_appeal` a
+        JOIN `student`   st ON st.id = a.student_id
+        JOIN `sys_class` c  ON c.id  = a.class_id
+        LEFT JOIN `score_item` i ON i.id = a.score_item_id
+        LEFT JOIN `sys_user`   u ON u.id = a.created_by
+        LEFT JOIN `sys_user`   r ON r.id = a.reviewed_by
+    </sql>
+
+    <sql id="mineWhere">
+        WHERE a.deleted = 0
+          AND a.created_by = #{userId}
+        <if test="status != null">AND a.status = #{status}</if>
+    </sql>
+
+    <select id="selectMine" resultType="com.quantify.score.ScoreAppeal">
+        <include refid="detailSelect"/>
+        <include refid="mineWhere"/>
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMine" resultType="long">
+        SELECT COUNT(*)
+        FROM `score_appeal` a
+        <include refid="mineWhere"/>
+    </select>
+
+    <!--
+      待处理列表：数据范围过滤只写这一个 IN，不做 if (scopeType) 分支（R7）。
+      范围为空时 service 已提前返回，这里再兜一层 1=0，避免漏条件变成全表。
+    -->
+    <sql id="pendingWhere">
+        WHERE a.deleted = 0
+          AND a.status = 0
+        <choose>
+            <when test="classIds != null and classIds.size() > 0">
+                AND a.class_id IN
+                <foreach collection="classIds" item="cid" open="(" separator="," close=")">
+                    #{cid}
+                </foreach>
+            </when>
+            <otherwise>AND 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectPending" resultType="com.quantify.score.ScoreAppeal">
+        <include refid="detailSelect"/>
+        <include refid="pendingWhere"/>
+        ORDER BY a.created_at ASC, a.id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPending" resultType="long">
+        SELECT COUNT(*)
+        FROM `score_appeal` a
+        <include refid="pendingWhere"/>
+    </select>
+
+    <select id="selectDetail" resultType="com.quantify.score.ScoreAppeal">
+        <include refid="detailSelect"/>
+        WHERE a.id = #{id}
+          AND a.deleted = 0
+    </select>
+
+</mapper>

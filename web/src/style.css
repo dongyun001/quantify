@@ -1,0 +1,54 @@
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f5f7fa;
+  color: #303133;
+}
+
+.page {
+  padding: 16px;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.page-desc {
+  font-size: 13px;
+  color: #909399;
+  margin: 0 0 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.toolbar .spacer { flex: 1; }
+
+/* 积分为正的显示绿色，为负的显示红色 —— 和财务软件的习惯一致 */
+.pts-plus { color: #67c23a; font-weight: 600; }
+.pts-minus { color: #f56c6c; font-weight: 600; }
+.pts-zero { color: #909399; }
+
+.total-cell { font-weight: 700; font-size: 15px; }
+
+.name-link {
+  color: #409eff;
+  cursor: pointer;
+  text-decoration: none;
+}
+.name-link:hover { text-decoration: underline; }

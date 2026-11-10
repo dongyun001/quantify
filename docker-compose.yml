@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: quantify-mysql
+    restart: unless-stopped
+    ports:
+      # 宿主用 3307，避开本机可能已有的 3306
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: quantify
+      TZ: Asia/Shanghai
+      # ★ 这一行不能删。
+      #   容器内 LANG 为空、locale 是 POSIX，mysql 客户端会默认用 latin1 而不是 utf8mb4。
+      #   docker-entrypoint-initdb.d 的初始化脚本正是用这个客户端跑的，
+      #   于是 seed_data.sql 里的中文被当 latin1 解读再存成 utf8mb4 —— 双重编码，
+      #   页面上显示成「é™¢å¦ç”Ÿä¼š」，而且【不报任何错】。
+      #   加了这个环境变量后客户端才会用 utf8mb4。
+      #   （试过挂 my.cnf，但 Windows 下挂进去的文件是 777，MySQL 会以
+      #    "World-writable config file is ignored" 为由忽略它，所以只能走 LANG。）
+      LANG: C.UTF-8
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-time-zone=+08:00
+      # GROUP_CONCAT 默认上限 1024 字节，超过会【静默截断】不报错。
+      # 导出 Excel 要拼接每个学生的全部备注，必须放开。
+      - --group-concat-max-len=1048576
+    volumes:
+      # 用【命名卷】而不是目录挂载：目录挂载的话 `docker compose down -v` 删不掉数据，
+      # 初始化脚本不会重跑，会留下一个"看起来重置了其实没有"的坑。
+      - mysql-data:/var/lib/mysql
+      # 首次启动（数据卷为空时）自动按文件名字母序执行：
+      #   schema.sql（建表 + 班级/学生/部门） → seed_data.sql（积分流水）
+      # 想重新初始化：docker compose down -v && docker compose up -d
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  mysql-data:
