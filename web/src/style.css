@@ -52,3 +52,53 @@ body {
   text-decoration: none;
 }
 .name-link:hover { text-decoration: underline; }
+
+/* ============================================================================
+   主题：Element Plus 变量对齐「更冷、更紧」的后台观感
+   主色 #165DFF / 圆角 2px / 灰底表头 / 行高收紧。
+   只改变量与少量密度，不动组件结构与业务样式。
+   ============================================================================ */
+:root {
+  --el-color-primary: #165dff;
+  --el-color-primary-light-3: #4e83fd;
+  --el-color-primary-light-5: #7aa7ff;
+  --el-color-primary-light-7: #a6c6ff;
+  --el-color-primary-light-8: #cbdcff;
+  --el-color-primary-light-9: #e8f3ff;
+  --el-color-primary-dark-2: #0e42d2;
+
+  --el-border-radius-base: 2px;
+  --el-border-radius-small: 2px;
+
+  --el-text-color-primary: #1d2129;
+  --el-text-color-regular: #4e5969;
+  --el-text-color-secondary: #86909c;
+  --el-text-color-placeholder: #a9aeb8;
+
+  --el-border-color: #e5e6eb;
+  --el-border-color-light: #f2f3f5;
+  --el-border-color-lighter: #f2f3f5;
+  --el-fill-color-light: #f7f8fa;
+  --el-fill-color-blank: #ffffff;
+  --el-bg-color-page: #f7f8fa;
+
+  --el-table-header-bg-color: #f7f8fa;
+  --el-table-header-text-color: #4e5969;
+  --el-table-row-hover-bg-color: #f7f8fa;
+  --el-table-border-color: #f2f3f5;
+  --el-table-text-color: #1d2129;
+}
+
+/* 密度：表头不再加粗、单元格收紧 */
+.el-table { font-size: 13px; }
+.el-table th.el-table__cell { font-weight: 500; }
+.el-table td.el-table__cell,
+.el-table th.el-table__cell { padding: 10px 0; }
+.el-table .cell { line-height: 22px; }
+
+/* 卡片与页面留白对齐新密度 */
+.el-card { border-radius: 2px; border-color: #f2f3f5; }
+.page { padding: 18px 20px; }
+.page-title { font-size: 19px; font-weight: 500; }
+.page-desc { font-size: 13px; color: #86909c; }
+.toolbar { gap: 8px; margin-bottom: 12px; }

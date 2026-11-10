@@ -1,9 +1,12 @@
 <template>
   <el-container class="layout">
-    <el-aside width="200px" class="aside">
+    <el-aside width="220px" class="aside">
       <div class="brand">
-        <div class="brand-title">量化积分</div>
-        <div class="brand-sub">管理系统</div>
+        <div class="brand-mark">积</div>
+        <div>
+          <div class="brand-title">量化积分</div>
+          <div class="brand-sub">软件工程学院</div>
+        </div>
       </div>
       <el-menu
         :default-active="activePath"
@@ -88,59 +91,84 @@ async function onLogout() {
 .layout { height: 100vh; }
 
 .aside {
-  background: #1f2d3d;
+  background: #fff;
+  border-right: 1px solid #f2f3f5;
   display: flex;
   flex-direction: column;
 }
 
 .brand {
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 16px 14px;
+}
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 2px;
+  background: #165dff;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
 }
 .brand-title {
-  color: #fff;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 1px;
+  color: #1d2129;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 .brand-sub {
-  color: rgba(255, 255, 255, 0.45);
+  color: #86909c;
   font-size: 12px;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .menu {
   border-right: none;
   background: transparent;
   flex: 1;
+  padding: 2px 8px;
 }
 .menu :deep(.el-menu-item) {
-  color: rgba(255, 255, 255, 0.7);
+  height: 38px;
+  line-height: 38px;
+  margin: 1px 0;
+  border-radius: 2px;
+  color: #4e5969;
+  font-size: 14px;
 }
 .menu :deep(.el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: #f7f8fa;
+  color: #1d2129;
 }
 .menu :deep(.el-menu-item.is-active) {
-  background: #409eff;
-  color: #fff;
+  background: #e8f3ff;
+  color: #165dff;
+  font-weight: 500;
 }
 
 .header {
   display: flex;
   align-items: center;
   gap: 12px;
+  height: 54px;
+  padding: 0 20px;
   background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid #f2f3f5;
 }
 .header .spacer { flex: 1; }
-.crumb { font-size: 15px; font-weight: 600; }
+.crumb { font-size: 15px; font-weight: 500; color: #1d2129; }
 .who { display: flex; align-items: center; gap: 8px; }
 .who .name { font-size: 14px; }
 
 .main {
   padding: 0;
-  background: #f5f7fa;
+  background: #f7f8fa;
   overflow: auto;
 }
 </style>
