@@ -23,22 +23,34 @@
       <el-table-column prop="deptName" label="部门标签" width="110">
         <template #default="{ row }">{{ row.deptName || '—' }}</template>
       </el-table-column>
-      <el-table-column label="对象" width="140">
+      <el-table-column label="对象" width="150">
         <template #default="{ row }">
-          <span class="mono">{{ row.targetType }}#{{ row.targetId }}</span>
+          <span class="mono">{{ targetText(row) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="改动详情" min-width="300">
+      <el-table-column label="干了什么" min-width="360">
         <template #default="{ row }">
-          <div v-if="row.beforeJson || row.afterJson" class="diff">
-            <div v-if="row.beforeJson" class="diff-before">
-              <span class="diff-label">改前</span>{{ row.beforeJson }}
-            </div>
-            <div v-if="row.afterJson" class="diff-after">
-              <span class="diff-label">改后</span>{{ row.afterJson }}
-            </div>
+          <div class="desc">{{ describeAudit(row).text }}</div>
+          <div v-if="describeAudit(row).reason" class="reason">
+            原因：{{ describeAudit(row).reason }}
           </div>
-          <span v-else class="dim">—</span>
+          <ul v-if="describeAudit(row).details.length" class="details">
+            <li v-for="(d, i) in describeAudit(row).details" :key="i">{{ d }}</li>
+          </ul>
+          <el-popover
+            v-if="row.beforeJson || row.afterJson"
+            trigger="click"
+            placement="left"
+            :width="520"
+          >
+            <template #reference>
+              <span class="raw-link">原始数据</span>
+            </template>
+            <div class="raw">
+              <div v-if="row.beforeJson"><b>改前</b><pre>{{ row.beforeJson }}</pre></div>
+              <div v-if="row.afterJson"><b>改后</b><pre>{{ row.afterJson }}</pre></div>
+            </div>
+          </el-popover>
         </template>
       </el-table-column>
       <el-table-column prop="operatorIp" label="IP" width="130" />
@@ -58,6 +70,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
+import { describeAudit, targetText } from '@/utils/audit'
 import request from '@/api/request'
 import type { AuditLog } from '@/api/types'
 
@@ -117,15 +130,43 @@ onMounted(load)
 
 <style scoped>
 .mono { font-family: Consolas, Monaco, monospace; font-size: 12px; color: #606266; }
-.dim { color: #c0c4cc; }
-.diff { font-size: 12px; line-height: 1.5; }
-.diff-label {
-  display: inline-block;
-  width: 34px;
-  color: #909399;
-  font-weight: 600;
+.desc { font-size: 13px; color: #1d2129; line-height: 1.6; }
+.reason {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #7a4a00;
+  background: #fff7e8;
+  border-left: 2px solid #ff9a2e;
 }
-.diff-before { color: #f56c6c; word-break: break-all; }
-.diff-after { color: #67c23a; word-break: break-all; }
+.details {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #4e5969;
+  line-height: 1.7;
+}
+.raw-link {
+  margin-top: 4px;
+  display: inline-block;
+  font-size: 12px;
+  color: #165dff;
+  cursor: pointer;
+}
+.raw-link:hover { text-decoration: underline; }
+.raw b { font-size: 12px; color: #4e5969; }
+.raw pre {
+  margin: 4px 0 10px;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  background: #f7f8fa;
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 .pager { margin-top: 12px; justify-content: flex-end; }
 </style>

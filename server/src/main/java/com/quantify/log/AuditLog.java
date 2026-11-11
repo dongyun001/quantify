@@ -50,4 +50,14 @@ public class AuditLog {
 
     @TableField(exist = false)
     private String deptName;
+
+    /** 快照里只有 studentId，查出来的展示字段：让「给谁加的分」一眼可见 */
+    @TableField(exist = false)
+    private String studentName;
+
+    @TableField(exist = false)
+    private String studentNo;
+
+    @TableField(exist = false)
+    private String className;
 }

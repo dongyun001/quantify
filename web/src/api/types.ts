@@ -375,4 +375,8 @@ export interface AuditLog {
   operatorName?: string
   operatorIp: string | null
   createdAt: string
+  /** 由后端按快照里的 studentId 回填，用于「给谁加的分」 */
+  studentName?: string | null
+  studentNo?: string | null
+  className?: string | null
 }
