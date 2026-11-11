@@ -1,11 +1,13 @@
 package com.quantify.score;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.quantify.common.PageResult;
 import com.quantify.common.R;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /** 积分查询：总表、学生明细、单条详情。三级都能调，范围由登录身份决定 */
 @RestController
@@ -24,6 +26,15 @@ public class ScoreQueryController {
                                              @RequestParam(defaultValue = "1") long page,
                                              @RequestParam(defaultValue = "50") long size) {
         return R.ok(scoreQueryService.board(term, keyword, classId, gradeId, page, size));
+    }
+
+    /** 按事由模糊搜索（FR-5.4）。不限学期/状态，只排除逻辑删除；仅一级、二级可用 */
+    @GetMapping("/search")
+    @SaCheckRole(value = {"ADMIN", "EDITOR"}, mode = cn.dev33.satoken.annotation.SaMode.OR)
+    public R<Map<String, Object>> searchByReason(@RequestParam String q,
+                                                 @RequestParam(defaultValue = "1") long page,
+                                                 @RequestParam(defaultValue = "50") long size) {
+        return R.ok(scoreQueryService.searchByReason(q, page, size));
     }
 
     /** 某个学生的分数汇总 */

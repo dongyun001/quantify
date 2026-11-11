@@ -16,6 +16,7 @@ export interface MenuItem {
  */
 export const menus: MenuItem[] = [
   { path: '/board', title: '积分总表', icon: 'Histogram' },
+  { path: '/search', title: '事由搜索', icon: 'Search', roles: ['ADMIN', 'EDITOR'] },
   { path: '/appeals', title: '我的申诉', icon: 'ChatDotRound', roles: ['VIEWER'] },
   { path: '/entry', title: '录入申请', icon: 'EditPen', roles: ['ADMIN', 'EDITOR'] },
   { path: '/import', title: '批量导入', icon: 'Upload', roles: ['ADMIN', 'EDITOR'] },

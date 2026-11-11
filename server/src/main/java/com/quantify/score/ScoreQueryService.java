@@ -10,7 +10,10 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +63,61 @@ public class ScoreQueryService {
         List<ScoreBoardVO> list = scoreItemMapper.selectBoard(
                 scope, t, keyword, effectiveClassId, gradeId, (p - 1) * s, s);
         return PageResult.of(total, p, s, list);
+    }
+
+    /**
+     * 按事由模糊搜索（FR-5.4）。
+     *
+     * <p>与总表口径不同：<b>不限学期、不限状态</b>，只排除逻辑删除——
+     * 这是「查某次活动的所有记录」，草稿/待审/被驳回的也要能翻出来对账。
+     *
+     * <p>返回 {@code total / page / size / summary / list}；
+     * {@code summary} 是全部命中记录的合计，不是当前页。
+     */
+    public Map<String, Object> searchByReason(String q, long page, long size) {
+        String keyword = q == null ? "" : q.trim();
+        if (keyword.isEmpty()) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "请输入事由关键字");
+        }
+        long p = Math.max(1, page);
+        long s = size <= 0 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("count", 0L);
+        summary.put("addPoints", BigDecimal.ZERO);
+        summary.put("deductPoints", BigDecimal.ZERO);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<Long> scope = ScopeContext.getClassIds();
+        if (scope.isEmpty()) {
+            result.put("total", 0L);
+            result.put("page", p);
+            result.put("size", s);
+            result.put("summary", summary);
+            result.put("list", List.of());
+            return result;
+        }
+
+        Map<String, Object> sum = scoreItemMapper.sumByReason(scope, keyword);
+        long total = 0L;
+        if (sum != null) {
+            Object cnt = sum.get("cnt");
+            total = cnt instanceof Number ? ((Number) cnt).longValue() : 0L;
+            summary.put("count", total);
+            summary.put("addPoints", sum.get("addPoints"));
+            summary.put("deductPoints", sum.get("deductPoints"));
+        }
+
+        List<ScoreItem> list = total == 0
+                ? List.of()
+                : scoreItemMapper.searchByReason(scope, keyword, (p - 1) * s, s);
+
+        result.put("total", total);
+        result.put("page", p);
+        result.put("size", s);
+        result.put("summary", summary);
+        result.put("list", list);
+        return result;
     }
 
     public ScoreBoardVO studentSummary(Long studentId, String term) {

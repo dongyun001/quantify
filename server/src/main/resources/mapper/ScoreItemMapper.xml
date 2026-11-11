@@ -269,6 +269,56 @@
         WHERE id = #{id} AND created_by = #{userId} AND deleted = 0
     </select>
 
+    <!-- ==================================================================
+         Q6.5 按事由模糊搜索
+
+         统计口径与总表不同：这里【不限学期、不限状态】，只要没被逻辑删除就列出来。
+         理由是这个功能是「查某次活动的加减分」——草稿、待审、被驳回的记录
+         同样要能被翻出来对账，套 R3 的「已通过 + 当前学期」会看不到一半。
+
+         范围过滤用 i.class_id（R4：录入时就固化，不 join student 反查）。
+         ================================================================== -->
+    <sql id="reasonWhere">
+        WHERE i.deleted = 0
+          AND i.reason LIKE CONCAT('%', #{keyword}, '%')
+        <if test="classIds != null and classIds.size() > 0">
+            AND i.class_id IN
+            <foreach collection="classIds" item="cid" open="(" separator="," close=")">
+                #{cid}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="searchByReason" resultType="com.quantify.score.ScoreItem">
+        SELECT
+            i.*,
+            st.student_no AS studentNo,
+            st.name       AS studentName,
+            c.name        AS className,
+            d.dept_name   AS deptName,
+            u.real_name   AS submitterName,
+            r.real_name   AS reviewerName
+        FROM `score_item` i
+        JOIN `student`   st ON st.id = i.student_id
+        JOIN `sys_class` c  ON c.id  = i.class_id
+        LEFT JOIN `sys_dept` d ON d.id = i.dept_id
+        LEFT JOIN `sys_user` u ON u.id = i.submitted_by
+        LEFT JOIN `sys_user` r ON r.id = i.reviewed_by
+        <include refid="reasonWhere"/>
+        ORDER BY i.occurred_on DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 汇总只碰 score_item 一张表：班级条件用 i.class_id，不需要 join -->
+    <select id="sumByReason" resultType="java.util.Map">
+        SELECT
+            COUNT(*)                                                          AS cnt,
+            IFNULL(SUM(CASE WHEN i.category = 1 THEN i.points ELSE 0 END), 0) AS addPoints,
+            IFNULL(SUM(CASE WHEN i.category = 2 THEN i.points ELSE 0 END), 0) AS deductPoints
+        FROM `score_item` i
+        <include refid="reasonWhere"/>
+    </select>
+
 
     <!-- ==================================================================
          Q7. 导出

@@ -77,6 +77,24 @@ public interface ScoreItemMapper extends BaseMapper<ScoreItem> {
     /** 按 id 查单条（带展示字段） */
     ScoreItem selectItemById(@Param("id") Long id);
 
+    /**
+     * 按事由模糊搜索流水（不分学期、不限状态，只排除逻辑删除）。
+     *
+     * <p>统计口径刻意放宽：这是「查某次活动的加减分」，草稿/待审/驳回的记录
+     * 也要能被找出来对账，不能只算已通过的。
+     *
+     * @param classIds 数据范围，来自登录身份（R7）
+     * @param keyword  事由关键字
+     */
+    List<ScoreItem> searchByReason(@Param("classIds") Collection<Long> classIds,
+                                   @Param("keyword") String keyword,
+                                   @Param("offset") long offset,
+                                   @Param("limit") long limit);
+
+    /** 与 searchByReason 同条件的汇总：命中条数、加分合计、扣分合计 */
+    java.util.Map<String, Object> sumByReason(@Param("classIds") Collection<Long> classIds,
+                                              @Param("keyword") String keyword);
+
     /** 导出用：一个班的所有学生分数（备注列需要拼接，见 XML 里的说明） */
     List<ScoreBoardVO> selectForExport(@Param("classId") Long classId,
                                        @Param("term") String term);

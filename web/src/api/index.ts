@@ -70,11 +70,39 @@ export interface ScoreItemForm {
   effectNow?: boolean
 }
 
+export interface ScoreSearchRow {
+  id: number
+  studentNo: string
+  studentName: string
+  className: string
+  term: string
+  category: number
+  dimension: number | null
+  points: number
+  reason: string
+  occurredOn: string | null
+  status: number
+  deptName?: string | null
+  reviewerName?: string | null
+}
+
+export interface ScoreSearchResult {
+  total: number
+  page: number
+  size: number
+  summary: { count: number; addPoints: number; deductPoints: number }
+  list: ScoreSearchRow[]
+}
+
 export const scoreApi = {
   board: (params: {
     term?: string; keyword?: string; classId?: number; gradeId?: number
     page?: number; size?: number
   }) => request.get<never, PageResult<ScoreBoardRow>>('/scores/board', { params }),
+
+  /** 按事由模糊搜索（Only ADMIN/EDITOR）。不限学期、不限状态，只排除逻辑删除 */
+  searchByReason: (params: { q: string; page?: number; size?: number }) =>
+    request.get<never, ScoreSearchResult>('/scores/search', { params }),
 
   summary: (studentId: number, term?: string) =>
     request.get<never, ScoreBoardRow>(`/scores/summary/${studentId}`, { params: { term } }),

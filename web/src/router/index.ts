@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '积分总表' },
       },
       {
+        path: 'search',
+        name: 'reasonSearch',
+        component: () => import('@/views/ReasonSearch.vue'),
+        meta: { title: '事由搜索', roles: ['ADMIN', 'EDITOR'] },
+      },
+      {
         path: 'appeals',
         name: 'appeals',
         component: () => import('@/views/Appeals.vue'),
